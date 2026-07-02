@@ -1,0 +1,31 @@
+{
+  "name": "@truetick/sdk",
+  "version": "0.1.1",
+  "description": "Official TypeScript SDK for the TrueTick Minecraft hosting API.",
+  "license": "MIT",
+  "author": "TrueTick",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/truetick-gg/truetick-js.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://truetick.gg/developers",
+  "bugs": { "url": "https://github.com/truetick-gg/truetick-js/issues" },
+  "keywords": ["minecraft", "hosting", "truetick", "sdk", "api"],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
