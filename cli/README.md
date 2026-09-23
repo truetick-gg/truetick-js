@@ -52,8 +52,11 @@ truetick wallet
 # List all servers
 truetick servers list
 
-# Get server details
+# Get server details (state, plan, version — no tick data)
 truetick servers get <id>
+
+# Live tick metrics for a running server
+truetick servers metrics <id>
 
 # Create a server
 truetick servers create --name "My SMP" --ram 4096 --type PAPER --version 1.20.4
@@ -248,7 +251,7 @@ truetick servers start <id>
 
 # Wait, then check metrics
 sleep 30
-truetick servers get <id>
+truetick servers metrics <id>
 ```
 
 ### Backup and restore workflow
@@ -289,13 +292,19 @@ truetick mods remove <id> --source modrinth --project sodium
 ### Monitor server metrics
 
 ```bash
-# Get TPS, MSPT, and player count
-truetick servers get <id>
+# Live TPS, MSPT and player count
+truetick servers metrics <id>
 
-# Detailed metrics including historical data
-curl -H "x-api-key: $TRUETICK_API_KEY" \
-  https://api.truetick.gg/v1/servers/<id>/metrics | jq .
+# One-minute buckets of tick health (default 24h, max 720)
+truetick servers tick-history <id> --hours 24
 ```
+
+`servers get` returns the server record — state, plan, version — and carries no tick data.
+
+Read `tps` together with `tpsSource`: `TPS_SOURCE_UNSPECIFIED` means there is **no reading**
+(the first poll after a start or wake, or a world parked by `pause-when-empty`), and `tps` is a
+zero value there, not zero performance. In `tick-history`, minutes the server slept through have
+no row at all — a gap is a real gap, never a zero.
 
 ## API Reference
 

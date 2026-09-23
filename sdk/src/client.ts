@@ -1,6 +1,6 @@
 import { Http } from "./http.js";
 import { Account } from "./account.js";
-import { toServer, toWallet, toBackup, num, Server, ServerMetrics, Wallet, Backup, FileEntry, Mod, WhoAmI, CreateServerInput, Template, TemplateOverrides, SftpCredential, toSftpCredential } from "./types.js";
+import { toServer, toWallet, toBackup, num, Server, ServerMetrics, TickHistory, Wallet, Backup, FileEntry, Mod, WhoAmI, CreateServerInput, Template, TemplateOverrides, SftpCredential, toSftpCredential } from "./types.js";
 import { parseLabel, serverHostname, gameDomainFromBaseUrl } from "./naming.js";
 
 const enc = encodeURIComponent;
@@ -48,6 +48,15 @@ export class TrueTickClient {
     restart: async (id: string): Promise<Server> => toServer(await this.http.post(`/v1/servers/${enc(id)}:restart`, {})),
     delete: async (id: string): Promise<void> => this.http.del(`/v1/servers/${enc(id)}`),
     metrics: async (id: string): Promise<ServerMetrics> => this.http.get(`/v1/servers/${enc(id)}/metrics`),
+    // Minute buckets of tick health. `hours` is clamped server-side to [1, 720];
+    // the response's own `hours` reports the window actually applied. Minutes
+    // with nothing to say (asleep, unmeasured) are absent rows, never zero rows
+    // — plot the gap, don't interpolate across it.
+    tickHistory: async (id: string, opts?: { hours?: number }): Promise<TickHistory> => {
+      const q = opts?.hours !== undefined ? `?hours=${encodeURIComponent(String(opts.hours))}` : "";
+      const r = await this.http.get(`/v1/servers/${enc(id)}/tick-history${q}`);
+      return { minutes: r.minutes ?? [], hours: num(r.hours) };
+    },
     updateVersion: async (id: string, v: { type: string; version: string }): Promise<Server> => toServer(await this.http.post(`/v1/servers/${enc(id)}:set-version`, v)),
     setProperties: async (id: string, p: { properties: Record<string, string>; idleTimeoutMinutes?: number }): Promise<Server> => toServer(await this.http.post(`/v1/servers/${enc(id)}:set-properties`, p)),
     setMotd: async (id: string, motd: string): Promise<Server> => toServer(await this.http.post(`/v1/servers/${enc(id)}:set-motd`, { motd })),

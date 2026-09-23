@@ -25,11 +25,85 @@ export interface Wallet {
   balanceMicros: number;
 }
 
+/**
+ * Where a `tps` reading came from. `TPS_SOURCE_UNSPECIFIED` means there is NO
+ * reading — the accompanying `tps` is a zero value, not a measured zero — and
+ * the API always sends one of these three, never an absent field.
+ */
+export type TPSSource = "TPS_SOURCE_UNSPECIFIED" | "TPS_SOURCE_CORE" | "TPS_SOURCE_MEASURED";
+
 export interface ServerMetrics {
+  /**
+   * Latest poll's ticks per second. Read it together with `tpsSource`: a `0`
+   * under `TPS_SOURCE_UNSPECIFIED` is an absence (first poll after a start or
+   * wake, or a world parked by `pause-when-empty`), while a `0` under
+   * `TPS_SOURCE_MEASURED` is a world that genuinely stopped ticking.
+   */
   tps: number;
+  /**
+   * How `tps` was obtained. `TPS_SOURCE_MEASURED` = we counted the world's own
+   * tick counter across the interval (Paper, Purpur, Vanilla and Fabric from
+   * Minecraft 1.20.3); `TPS_SOURCE_CORE` = the core reported its own achieved
+   * rate (Forge, NeoForge, pre-1.20.3 Paper/Purpur, Pumpkin). Optional in this
+   * type only so callers pointed at an older API build keep compiling.
+   */
+  tpsSource?: TPSSource;
+  /** Mean milliseconds per tick, as the core reports it. */
   mspt: number;
+  /** 95th-percentile tick time. `0`/absent = this core prints no percentiles. */
+  msptP95?: number;
+  /** The core's own word about its loop: `"running"`, `"lagging"`, or `""`. */
+  tickStatus?: string;
+  /** The rate the server is configured to aim for (normally 20). `0` = not reported. */
+  targetTps?: number;
+  /** Smoothed rate over a trailing 60s window — what the panel tile shows. */
+  headlineTps?: number;
+  /**
+   * How much measured ticking `headlineTps` rests on. Less than 60 right after
+   * a start or wake; `0` means there is no headline yet.
+   */
+  headlineWindowSeconds?: number;
   players: number;
+  /**
+   * Tick data (MSPT, status, players) is a fresh measurement. This does NOT
+   * imply a TPS reading exists — gate the number itself on `tpsSource`.
+   */
   live: boolean;
+}
+
+/** One minute of tick health from `GET /v1/servers/{id}/tick-history`. */
+export interface TickMinute {
+  /** RFC3339 start of the minute this bucket covers. */
+  minute: string;
+  /**
+   * Ticks per second across the minute. On cores we measure (Paper, Purpur,
+   * Vanilla, Fabric from Minecraft 1.20.3) this is counted off the world tick
+   * counter over the minute — a rate, not an average of rates. On cores that
+   * report their own TPS (Forge, NeoForge, Pumpkin, pre-1.20.3 Paper/Purpur) there is
+   * no counter to subtract, so the bucket carries the mean of what the core
+   * said, which is the only number that exists for them. `ServerMetrics.tpsSource`
+   * on a live poll tells you which of the two a given server produces.
+   */
+  tps: number;
+  msptMean: number;
+  /**
+   * Absent when the core prints no percentiles — never fabricated as 0. This
+   * one really is nullable on the wire (a proto3 `optional`), unlike
+   * `ServerMetrics.msptP95`, where 0 is the "not reported" signal.
+   */
+  msptP95?: number | null;
+  players: number;
+  /** True when at least one poll in the minute had the core reporting "lagging". */
+  lagging: boolean;
+  /** How many polls this bucket rests on — 2 is a weaker claim than 12. */
+  samples: number;
+}
+
+export interface TickHistory {
+  /** Oldest first. A missing minute is a real gap, never a zero row. */
+  minutes: TickMinute[];
+  /** The window actually applied after server-side clamping to [1, 720]. */
+  hours: number;
 }
 
 export interface Backup {

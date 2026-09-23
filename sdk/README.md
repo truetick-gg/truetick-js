@@ -25,9 +25,12 @@ console.log(servers);
 const server = await client.servers.start("srv_xyz");
 console.log(`Started ${server.hostname}`);
 
-// Get metrics
-const metrics = await client.servers.metrics("srv_xyz");
-console.log(`TPS: ${metrics.tps}, Players: ${metrics.players}`);
+// Get metrics. Read tps together with tpsSource: TPS_SOURCE_UNSPECIFIED means
+// there is NO reading (first poll after a start or wake, or a world parked by
+// pause-when-empty) and tps is a zero value there, not zero performance.
+const m = await client.servers.metrics("srv_xyz");
+const rate = m.tpsSource === "TPS_SOURCE_UNSPECIFIED" ? "no TPS reading yet" : `TPS: ${m.tps}`;
+console.log(`${rate}, Players: ${m.players}`);
 ```
 
 ## Authentication
@@ -47,6 +50,65 @@ Or use the `TRUETICK_API_KEY` environment variable:
 const client = new TrueTickClient();
 // Reads apiKey from process.env.TRUETICK_API_KEY
 ```
+
+## Sign In with TrueTick (Apps)
+
+For third-party applications (e.g., Electron launchers), use device flow (RFC 8628) to sign players in and list their servers:
+
+```typescript
+import { signInWithDevice, AppClient } from "@truetick/sdk";
+
+// Step 1: Initiate device flow
+const { token, scope } = await signInWithDevice({
+  clientId: "my-app",
+  scope: "servers:list",
+  onCode: (prompt) => {
+    // Display to user: "Enter code ABCD-1234 at https://truetick.gg/device?code=ABCD-1234"
+    console.log(`Visit: ${prompt.verificationUriComplete}`);
+  }
+});
+
+// Step 2: Use the token to list servers
+const appClient = new AppClient({ token });
+const { my, shared } = await appClient.listMyServers();
+console.log(`Owned servers: ${my.length}, Shared: ${shared.length}`);
+
+// Step 3: Get account info
+const whoami = await appClient.whoAmI();
+console.log(`Signed in as: ${whoami.email}`);
+```
+
+**Device flow options:**
+- `clientId` (required) — your app's ID (e.g., `"my-launcher"`)
+- `scope` (optional) — defaults to `"servers:list"` 
+- `onCode` (required) — callback to display the user code and verification URL
+- `baseUrl` (optional) — API endpoint; defaults to `https://api.truetick.gg`
+- `signal` (optional) — AbortSignal to cancel sign-in
+- `sleep` (optional) — async sleep function for testing; defaults to setTimeout
+
+**AppClient methods:**
+- `.listMyServers()` — returns `{ my: MyServer[], shared: MyServer[] }` with owned and shared servers.
+  Each `MyServer` has `id`, `address`, `state`, `type`, `version`, `region`, `role` and, only when
+  live stats are fresh, `playersOnline` (absent = unknown, not zero). An absent or empty `address`
+  means a private network backend with no public address of its own: players join through the
+  network's proxy. Nothing about the owning account is returned.
+- `.whoAmI()` — returns `{ email }` (an app token carries no account id)
+
+**Error handling:**
+
+Both functions throw `TrueTickError` on failure. Distinguish between "sign in again" (terminal) and "try later" (transient):
+
+- **signInWithDevice** — codes:
+  - Terminal: `access_denied` (user denied), `expired_token` (code timed out), `invalid_client` / `invalid_scope` / `invalid_request` (configuration), `device_start_failed` / `sign_in_failed` (server error), `bad_response` (non-JSON response), `aborted` (user cancelled)
+  - Try later: `server_error` (status 500 while starting the grant — a transient failure on TrueTick's side) and status 429 (the per-IP limit on starting grants: 20 per hour) — start sign-in again later
+  - Internal only: `authorization_pending` and `slow_down` are handled automatically, and a 5xx or 429 while polling is retried until the code expires — never thrown
+
+- **AppClient** — codes:
+  - Terminal: `unauthenticated` (status 401 — token revoked/invalid; delete it and sign in again), `permission_denied` (403)
+  - Transient: `rate_limited` (429), `unavailable` (>=500), `bad_response` (non-JSON response)
+  - Other: `http_<status>` for unmapped 4xx errors
+
+Retry logic: transient codes → keep token and retry later; terminal codes → discard token and re-sign-in.
 
 ## Resources
 
@@ -98,13 +160,35 @@ await client.servers.delete("srv_xyz");
 ### Metrics
 
 ```typescript
-const metrics = await client.servers.metrics("srv_xyz");
-console.log(metrics.tps, metrics.mspt, metrics.players, metrics.live);
+const m = await client.servers.metrics("srv_xyz");
 
-// Access historical data
-metrics.series.forEach(sample => {
-  console.log(`${sample.ts}: TPS=${sample.tps}, players=${sample.players}`);
-});
+// `live` gates tick data (mspt, players). It does NOT mean a TPS reading
+// exists — gate the rate itself on tpsSource, or a healthy server's first
+// poll after a wake reads as 0 TPS.
+if (m.tpsSource === "TPS_SOURCE_MEASURED" || m.tpsSource === "TPS_SOURCE_CORE") {
+  console.log(`${m.tps} TPS, mspt ${m.mspt}`);
+}
+
+// targetTps and msptP95 are a NARROWER set than tps: only cores answering the
+// vanilla `tick query` report them (Paper, Purpur, Vanilla, Fabric from
+// Minecraft 1.20.3). On Forge, NeoForge, Pumpkin and pre-1.20.3 Paper/Purpur both are
+// structurally 0 — which is the documented "not reported" signal, not a target
+// of zero and not a perfectly flat tail. Printing them under the same branch as
+// tps invents both.
+if (m.targetTps) console.log(`target ${m.targetTps} TPS`);
+if (m.msptP95) console.log(`p95 ${m.msptP95}ms — the tail is where stutter lives`);
+
+// Same rule: "" means the core has no state word, not that it is healthy.
+if (m.tickStatus === "lagging") {
+  console.log("the core itself reports it cannot keep up");
+}
+
+// Historical data: one row per minute, oldest first. Minutes the server slept
+// through have no row at all — a gap is a real gap, never a zero.
+const history = await client.servers.tickHistory("srv_xyz", { hours: 24 });
+for (const min of history.minutes) {
+  console.log(`${min.minute}: ${min.tps} TPS over ${min.samples} polls${min.lagging ? " (lagging)" : ""}`);
+}
 ```
 
 ### Console (RCON)
@@ -221,6 +305,9 @@ All major types are exported:
 import {
   Server,
   ServerMetrics,
+  TPSSource,
+  TickMinute,
+  TickHistory,
   Wallet,
   Backup,
   FileEntry,
@@ -234,7 +321,15 @@ import {
 Key type hints:
 
 - `Server`: id, hostname, state, ramMb, type, version, region, plan, motd, properties, etc.
-- `ServerMetrics`: tps, mspt, players, live, series (historical samples)
+- `ServerMetrics`: tps, tpsSource, mspt, msptP95, tickStatus, targetTps, headlineTps,
+  headlineWindowSeconds, players, live. `tps` is only a reading when `tpsSource` is
+  `TPS_SOURCE_MEASURED` (we counted the world's own tick counter) or `TPS_SOURCE_CORE`
+  (the core reported its own rate); under `TPS_SOURCE_UNSPECIFIED` it is a zero value,
+  not a measurement
+- `TickHistory`: minutes (`TickMinute[]`, oldest first), hours (the window actually applied
+  after server-side clamping to 1-720)
+- `TickMinute`: minute, tps, msptMean, msptP95 (null when the core prints no percentiles),
+  players, lagging, samples
 - `Wallet`: accountId, balanceMicros (in microdollars; divide by 1_000_000 for display)
 - `Backup`: id, serverId, createdAt, sizeBytes
 - `FileEntry`: name, isDir, size

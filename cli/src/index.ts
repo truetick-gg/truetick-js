@@ -61,6 +61,20 @@ export function buildProgram(make: MakeClient = defaultMakeClient): Command {
   servers.command("get <id>")
     .action((id) => run(json(), make, (c) => c.servers.get(id)));
 
+  // `servers get` returns the Server record — state, plan, version — and no
+  // tick data: proto's `message Server` has no tps/mspt/players field at all.
+  // The README claimed otherwise for as long as it has been on npm. These two
+  // commands are what make that section true rather than deleted.
+  servers.command("metrics <id>")
+    .description("Live TPS/MSPT/players. Read tps together with tpsSource: TPS_SOURCE_UNSPECIFIED means no reading, not zero performance.")
+    .action((id) => run(json(), make, (c) => c.servers.metrics(id)));
+
+  servers.command("tick-history <id>")
+    .description("One-minute buckets of tick health (default 24h, max 720). Minutes the server slept through are absent rows, not zeroes.")
+    .option("--hours <n>", "window in hours (clamped server-side to 1-720)")
+    .action((id, o) => run(json(), make, (c) =>
+      c.servers.tickHistory(id, o.hours ? { hours: Number(o.hours) } : undefined)));
+
   servers.command("start <id>")
     .action((id) => run(json(), make, (c) => c.servers.start(id)));
 
@@ -330,7 +344,7 @@ export function buildProgram(make: MakeClient = defaultMakeClient): Command {
   // topup
   program.command("topup")
     .description("Add funds to your wallet via a Paddle checkout link")
-    .requiredOption("--amount <usd>", "amount in USD (one of the available packages)")
+    .requiredOption("--amount <usd>", "amount in USD ($5-$100, whole dollars)")
     .action(async (o) => {
       try { await runTopup(defaultTopupDeps(make), Number(o.amount)); }
       catch (e) { printError(e); process.exitCode = 1; }
