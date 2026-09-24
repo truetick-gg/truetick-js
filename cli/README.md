@@ -90,7 +90,7 @@ truetick files ls <id> /data
 # Read a file
 truetick files cat <id> /data/server.properties
 
-# Write a file from local file
+# Upload a local file over SFTP (each call issues a new SFTP password, see Mods below)
 truetick files put <id> /data/motd.txt ./local-motd.txt
 
 # Delete a file (requires --yes confirmation)
@@ -116,15 +116,24 @@ truetick backups restore <id> <backupId> --yes
 # List installed mods
 truetick mods list <id>
 
-# Add a mod from Modrinth
-truetick mods add <id> --source modrinth --project sodium --version 0.5.11
+# Add from Modrinth: Chunky has builds for Paper and for the mod loaders.
+# --version (optional) is a version number or ID from the project's Modrinth versions page.
+truetick mods add <id> --source modrinth --project chunky
 
-# Add from CurseForge
-truetick mods add <id> --source curseforge --project 394468 --version mc1.20.4-0.11.2
+# Add from CurseForge by numeric project ID: 360438 is Lithium, a Fabric and NeoForge mod.
+# --version (optional) is a numeric file ID.
+truetick mods add <id> --source curseforge --project 360438
 
 # Remove a mod
-truetick mods remove <id> --source modrinth --project sodium
+truetick mods remove <id> --source modrinth --project chunky
 ```
+
+An add can also write the project's required Modrinth dependencies as entries of their own (Chunky on
+a Fabric server brings Fabric API). Modrinth mods marked client-side only are refused on Fabric, Forge
+and NeoForge, and catalog adds are refused on a Velocity proxy — upload the plugin's `.jar` there
+with `truetick files put`. Each `files put` (and each `deploy`) issues a new SFTP password for the
+server, and the previous one stops working. If you keep a saved SFTP login (FileZilla, WinSCP), use
+**Upload .jar** in the panel instead (up to 100 MB): it leaves the SFTP password alone.
 
 ## Plugin/mod dev loop
 
@@ -138,12 +147,15 @@ truetick down --yes                    # remove the ephemeral dev server
 ```
 
 `init` writes `truetick.toml` (server id, target dir, build command, artifact glob). Uploads use
-per-server SFTP and are binary-safe with no size cap. A `--create` server is metered + scale-to-zero:
-you are billed only while it is awake.
+per-server SFTP and are binary-safe with no size cap. Each upload issues a new SFTP password for the
+server, so an SFTP login saved elsewhere stops working. A `--create` server is metered +
+scale-to-zero: you are billed only while it is awake.
 
 `dev` deploys once, then watches the artifact glob and redeploys on every change (debounced), while
-tailing the server log live. Press Ctrl-C to stop watching. `down --yes` deletes the bound server; it
-warns first if the server was not created by `init` (`ephemeral = false`).
+tailing the server log live. Press Ctrl-C to stop watching. `down --yes` deletes the dev server that
+`init --create` made (`ephemeral = true`). It refuses a server bound with `init --server`
+(`ephemeral = false`), even with `--yes`: deleting that one takes its world, files and backups with it,
+so it needs the explicit `truetick servers delete <id> --yes`.
 
 ## Options
 
@@ -279,14 +291,14 @@ truetick servers start <id>
 # List current mods
 truetick mods list <id>
 
-# Add Sodium for optimization
-truetick mods add <id> --source modrinth --project sodium
+# Add Chunky (Modrinth) to a Paper server
+truetick mods add <id> --source modrinth --project chunky
 
-# Add Lithium (CurseForge)
-truetick mods add <id> --source curseforge --project 394468
+# Add Lithium (CurseForge project 360438) to a Fabric or NeoForge server
+truetick mods add <id> --source curseforge --project 360438
 
-# Remove Sodium
-truetick mods remove <id> --source modrinth --project sodium
+# Remove Chunky
+truetick mods remove <id> --source modrinth --project chunky
 ```
 
 ### Monitor server metrics

@@ -1,6 +1,11 @@
 import { signup as realSignup, login as realLogin, deviceStart, devicePoll, MintedAuth } from "@truetick/sdk";
 import open from "open";
 import { saveConfig } from "../config.js";
+import { CLI_USER_AGENT } from "../version.js";
+
+// Onboarding goes through the SDK's auth helpers rather than cliClient, so it
+// names the CLI itself.
+const asCli = { userAgent: CLI_USER_AGENT };
 
 export interface AuthIO {
   signup: (baseUrl: string, email: string, password: string) => Promise<MintedAuth>;
@@ -10,8 +15,8 @@ export interface AuthIO {
 }
 
 export const defaultAuthIO: AuthIO = {
-  signup: realSignup,
-  login: realLogin,
+  signup: (baseUrl, email, password) => realSignup(baseUrl, email, password, asCli),
+  login: (baseUrl, email, password) => realLogin(baseUrl, email, password, asCli),
   save: (cfg) => saveConfig(cfg),
   log: (s) => console.log(s),
 };
@@ -43,8 +48,8 @@ export interface DeviceLoginDeps {
 
 export function defaultDeviceDeps(baseUrl: string): DeviceLoginDeps {
   return {
-    start: () => deviceStart(baseUrl),
-    poll: (deviceCode) => devicePoll(baseUrl, deviceCode),
+    start: () => deviceStart(baseUrl, asCli),
+    poll: (deviceCode) => devicePoll(baseUrl, deviceCode, asCli),
     // Just attempt to open the browser — any failure throws and is handled in
     // runDeviceLogin's single non-fatal layer (which prints the URL via deps.log).
     openBrowser: async (url) => {

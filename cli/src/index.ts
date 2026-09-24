@@ -3,6 +3,7 @@ import { basename, posix } from "node:path";
 import { createInterface } from "node:readline";
 import { Command } from "commander";
 import { TrueTickClient } from "@truetick/sdk";
+import { cliClient } from "./client.js";
 import { resolveKey, saveConfig, clearConfig } from "./config.js";
 import { printResult, printError } from "./output.js";
 import { runInit, defaultInitDeps } from "./commands/init.js";
@@ -29,7 +30,7 @@ const defaultMakeClient: MakeClient = () => {
     console.error("No API key. Run `truetick login` or set TRUETICK_API_KEY.");
     process.exit(1);
   }
-  return new TrueTickClient({ apiKey, baseUrl });
+  return cliClient(apiKey, baseUrl);
 };
 
 // run wraps an SDK call: resolve client, execute, print, handle errors + exit code.
@@ -293,7 +294,7 @@ export function buildProgram(make: MakeClient = defaultMakeClient): Command {
 
   // down
   program.command("down")
-    .description("Delete the dev server bound in truetick.toml")
+    .description("Delete the dev server `init --create` made (refuses a server bound with `init --server`)")
     .option("--yes", "confirm deletion")
     .action(async (o) => {
       const project = loadProject(process.cwd());

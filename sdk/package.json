@@ -1,6 +1,6 @@
 {
   "name": "@truetick/sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official TypeScript SDK for the TrueTick Minecraft hosting API.",
   "license": "MIT",
   "author": "TrueTick",
@@ -19,6 +19,7 @@
   "files": ["dist"],
   "publishConfig": { "access": "public" },
   "scripts": {
+    "prebuild": "node scripts/write-version.mjs",
     "build": "tsc",
     "test": "vitest run",
     "prepublishOnly": "npm run build"

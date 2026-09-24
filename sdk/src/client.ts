@@ -1,11 +1,16 @@
-import { Http } from "./http.js";
+import { Http, userAgentWith } from "./http.js";
 import { Account } from "./account.js";
 import { toServer, toWallet, toBackup, num, Server, ServerMetrics, TickHistory, Wallet, Backup, FileEntry, Mod, WhoAmI, CreateServerInput, Template, TemplateOverrides, SftpCredential, toSftpCredential } from "./types.js";
 import { parseLabel, serverHostname, gameDomainFromBaseUrl } from "./naming.js";
 
 const enc = encodeURIComponent;
 
-export interface ClientOptions { apiKey?: string; baseUrl?: string }
+export interface ClientOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  /** Your own product token, sent ahead of the SDK's: "my-bot/1.2" → "my-bot/1.2 truetick-sdk/<version>". Not sent from a browser, which sets its own. */
+  userAgent?: string;
+}
 
 export class TrueTickClient {
   private http: Http;
@@ -16,7 +21,7 @@ export class TrueTickClient {
     const apiKey = opts.apiKey ?? process.env.TRUETICK_API_KEY;
     if (!apiKey) throw new Error("TrueTick API key required (opts.apiKey or TRUETICK_API_KEY).");
     this.baseUrl = opts.baseUrl ?? process.env.TRUETICK_API_URL ?? "https://api.truetick.gg";
-    this.http = new Http(this.baseUrl, apiKey);
+    this.http = new Http(this.baseUrl, apiKey, userAgentWith(opts.userAgent));
     this.account = new Account(this.http);
   }
 

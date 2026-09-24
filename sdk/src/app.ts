@@ -1,4 +1,4 @@
-import { TrueTickError } from "./errors";
+import { TrueTickError } from "./errors.js";
 
 const DEFAULT_BASE = "https://api.truetick.gg";
 const envBase = (): string | undefined =>

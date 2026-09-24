@@ -51,6 +51,11 @@ const client = new TrueTickClient();
 // Reads apiKey from process.env.TRUETICK_API_KEY
 ```
 
+Outside a browser, every request carries `User-Agent: truetick-sdk/<version>`. Pass
+`userAgent: "my-bot/1.2"` to put your own product token in front of it (`my-bot/1.2 truetick-sdk/<version>`).
+In a browser page or worker the SDK adds no `User-Agent`: the browser sends its own, and the API's CORS
+rules don't list `User-Agent` among the headers a page may set.
+
 ## Sign In with TrueTick (Apps)
 
 For third-party applications (e.g., Electron launchers), use device flow (RFC 8628) to sign players in and list their servers:
@@ -237,26 +242,34 @@ await client.backups.restore("srv_xyz", backup.id);
 const mods = await client.mods.list("srv_xyz");
 mods.forEach(m => console.log(m.projectId, m.versionSpec));
 
-// Add a mod from Modrinth
+// Add from Modrinth — Chunky has builds for Paper and for the mod loaders
 await client.mods.add("srv_xyz", {
   source: "modrinth",
-  projectId: "sodium",
-  versionSpec: "0.5.11" // optional
+  projectId: "chunky",
+  // versionSpec (optional): a version number or ID from the project's Modrinth
+  // versions page, built for the server's Minecraft version
 });
 
-// Add from CurseForge
+// Add from CurseForge by numeric project ID — on a Fabric or NeoForge server
 await client.mods.add("srv_xyz", {
   source: "curseforge",
-  projectId: "394468", // Lithium project ID
-  versionSpec: "mc1.20.4-0.11.2"
+  projectId: "360438", // Lithium
+  // versionSpec (optional): a numeric file ID
 });
 
 // Remove a mod
 await client.mods.remove("srv_xyz", {
   source: "modrinth",
-  projectId: "sodium"
+  projectId: "chunky"
 });
 ```
+
+An add can also write the project's required Modrinth dependencies as entries of their own (Chunky on a
+Fabric server brings Fabric API). Modrinth mods marked client-side only are refused on Fabric, Forge and
+NeoForge, and catalog adds are refused on a Velocity proxy — upload the plugin's `.jar` there over SFTP
+(`client.servers.enableSftp`). Each `enableSftp` call issues a new SFTP password for the server, and the
+previous one stops working. If you keep a saved SFTP login (FileZilla, WinSCP), use **Upload .jar** in
+the panel instead (up to 100 MB): it leaves the SFTP password alone.
 
 ### Wallet
 
@@ -274,7 +287,7 @@ console.log(whoami.accountId, whoami.email);
 
 ## Error Handling
 
-All errors are thrown as `TrueTickError`:
+All errors are thrown as `TrueTickError`, carrying the server's own explanation:
 
 ```typescript
 import { TrueTickError } from "@truetick/sdk";
@@ -283,19 +296,24 @@ try {
   await client.servers.start("srv_xyz");
 } catch (e) {
   if (e instanceof TrueTickError) {
-    console.error(`API Error (${e.code}): ${e.message}`);
-    if (e.status === 401) console.error("Invalid API key");
-    if (e.status === 403) console.error("Missing scope for this operation");
-    if (e.status === 404) console.error("Server not found");
-    if (e.status === 429) console.error("Rate limited; retry later");
+    console.error(`API Error (${e.grpcCode ?? e.code}): ${e.message}`);
+    // e.g. "API Error (failed_precondition): top up your wallet to start this server"
   }
 }
 ```
 
-Error fields:
+Error fields of the client and the auth helpers (`signInWithDevice` and `AppClient` use the codes listed
+under [Sign In with TrueTick](#sign-in-with-truetick-apps) and never set `grpcCode` or `retryAfter`):
 - `status` — HTTP status code
-- `code` — machine-readable error code (`unauthorized`, `forbidden`, `not_found`, `rate_limited`, `server_error`)
-- `message` — human-readable error description
+- `code` — derived from the HTTP status (`unauthorized`, `forbidden`, `not_found`, `rate_limited`, `server_error`, or `http_error` for any other status)
+- `message` — the server's own text when the response carried one (`node at capacity`); otherwise a generic sentence for the status
+- `grpcCode` — the gRPC code name the API sent (`failed_precondition`, `resource_exhausted`, …), when it sent one
+- `retryAfter` — seconds from the `Retry-After` header, when the response had one
+- `details` — the gRPC status `details` array, as sent
+
+A `429` can be the rate limit (`rate limit exceeded`), an honest capacity refusal (`node at capacity`)
+or an account limit (`server limit reached (N)`); of those, only the rate limit clears up on a backoff timer. Which
+refusals are worth retrying: [docs.truetick.gg/errors](https://docs.truetick.gg/errors).
 
 ## Types
 
