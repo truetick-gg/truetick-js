@@ -20,6 +20,7 @@ function client(baseUrl = "https://api.example") {
     if (url.endsWith("/v1/templates")) return new Response(JSON.stringify({ templates: [{ id: "paper-survival", ramMb: "2048" }] }), { status: 200 });
     if (url.includes("/v1/servers?account_id=")) return new Response(JSON.stringify({ servers: [{ id: "s1", ramMb: "4096" }] }), { status: 200 });
     if (url.endsWith("/v1/servers/s1:command")) return new Response(JSON.stringify({ output: "pong" }), { status: 200 });
+    if (url.includes("/v1/servers/s1/mods/versions")) return new Response(JSON.stringify({ versions: [{ id: "tY57GRtu", number: "9.4.1", versionType: "beta", publishedUnix: "1790000000" }], partial: false }), { status: 200 });
     if (url.includes("/v1/servers/s1/files")) return new Response(JSON.stringify({ entries: [{ name: "server.properties", isDir: false, size: "12345" }] }), { status: 200 });
     if (url.includes("/v1/templates/") && url.endsWith(":create")) return new Response(JSON.stringify({ id: "my-server", hostname: "my-server", container: "mc_my-server", addr: "", state: "stopped" }), { status: 200 });
     return new Response(JSON.stringify({ id: "myserver", hostname: "myserver", container: "mc_myserver", addr: "", state: "stopped" }), { status: 200 });
@@ -34,6 +35,12 @@ describe("TrueTickClient", () => {
     const servers = await client().servers.list();
     expect((fetch as any).mock.calls.some((c: any[]) => c[0] === "https://api.example/v1/servers?account_id=acc-1")).toBe(true);
     expect(servers[0].ramMb).toBe(4096); // number, not "4096"
+  });
+
+  it("mods.versions queries the server's pin list and coerces int64 publishedUnix", async () => {
+    const r = await client().mods.versions("s1", { source: "modrinth", projectId: "59ZceYlU" });
+    expect((fetch as any).mock.calls.some((c: any[]) => c[0] === "https://api.example/v1/servers/s1/mods/versions?source=modrinth&project_id=59ZceYlU")).toBe(true);
+    expect(r).toEqual({ versions: [{ id: "tY57GRtu", number: "9.4.1", versionType: "beta", publishedUnix: 1790000000 }], partial: false });
   });
 
   it("console.run posts to :command", async () => {

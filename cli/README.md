@@ -124,6 +124,9 @@ truetick mods add <id> --source modrinth --project chunky
 # --version (optional) is a numeric file ID.
 truetick mods add <id> --source curseforge --project 360438
 
+# Builds this server can pin (betas included) — pass one's id as --version to mods add
+truetick mods versions <id> --source modrinth --project chunky
+
 # Remove a mod
 truetick mods remove <id> --source modrinth --project chunky
 ```

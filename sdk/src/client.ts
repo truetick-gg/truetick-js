@@ -1,6 +1,6 @@
 import { Http, userAgentWith } from "./http.js";
 import { Account } from "./account.js";
-import { toServer, toWallet, toBackup, num, Server, ServerMetrics, TickHistory, Wallet, Backup, FileEntry, Mod, WhoAmI, CreateServerInput, Template, TemplateOverrides, SftpCredential, toSftpCredential } from "./types.js";
+import { toServer, toWallet, toBackup, num, Server, ServerMetrics, TickHistory, Wallet, Backup, FileEntry, Mod, ModVersion, WhoAmI, CreateServerInput, Template, TemplateOverrides, SftpCredential, toSftpCredential } from "./types.js";
 import { parseLabel, serverHostname, gameDomainFromBaseUrl } from "./naming.js";
 
 const enc = encodeURIComponent;
@@ -141,6 +141,14 @@ export class TrueTickClient {
     list: async (id: string): Promise<Mod[]> => ((await this.http.get(`/v1/servers/${enc(id)}/mods`)).mods ?? []),
     add: async (id: string, m: { source: string; projectId: string; versionSpec?: string }): Promise<void> => { await this.http.post(`/v1/servers/${enc(id)}/mods`, m); },
     remove: async (id: string, m: { source: string; projectId: string }): Promise<void> => { await this.http.post(`/v1/servers/${enc(id)}/mods:remove`, m); },
+    /** Builds of a project this server can pin: its loader and Minecraft version only, pre-releases included, newest first. `partial` = CurseForge holds more files than were read. */
+    versions: async (id: string, m: { source: string; projectId: string }): Promise<{ versions: ModVersion[]; partial: boolean }> => {
+      const r = await this.http.get(`/v1/servers/${enc(id)}/mods/versions?source=${enc(m.source)}&project_id=${enc(m.projectId)}`);
+      return {
+        versions: (r.versions ?? []).map((v: any) => ({ id: v.id, number: v.number ?? "", versionType: v.versionType ?? "", publishedUnix: num(v.publishedUnix) })),
+        partial: r.partial === true,
+      };
+    },
   };
 
   wallet = {

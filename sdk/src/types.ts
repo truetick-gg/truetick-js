@@ -111,6 +111,15 @@ export interface Backup {
   serverId: string;
   createdAt: string;
   sizeBytes: number;
+  /**
+   * Which path took the backup: "auto" (the daily backup), "manual",
+   * "scheduled", "preop" (right before a destructive operation), "reaped",
+   * "adopted" (found on disk without a record) or "legacy" (taken before
+   * kinds were recorded). Absent from an older API.
+   */
+  kind?: string;
+  /** Qualifies kind; for "preop", the operation it was taken before ("version-change"). */
+  reason?: string;
 }
 
 export interface FileEntry {
@@ -123,7 +132,19 @@ export interface Mod {
   source: string;
   projectId: string;
   versionSpec?: string;
+  /** The pinned build's version number (Modrinth) or file name (CurseForge), recorded when the pin was set. */
+  versionLabel?: string;
   name?: string;
+}
+
+/** One build of a catalog project a server can pin; pass `id` as `versionSpec` to `mods.add`. */
+export interface ModVersion {
+  id: string;
+  number: string;
+  /** "release" | "beta" | "alpha", or "" when the upstream states none. */
+  versionType: string;
+  /** Unix seconds; 0 when unknown. */
+  publishedUnix: number;
 }
 
 export interface SftpCredential {
@@ -205,4 +226,6 @@ export const toBackup = (r: any): Backup => ({
   serverId: r.serverId,
   createdAt: r.createdAt,
   sizeBytes: num(r.sizeBytes),
+  kind: r.kind,
+  reason: r.reason,
 });

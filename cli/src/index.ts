@@ -225,6 +225,14 @@ export function buildProgram(make: MakeClient = defaultMakeClient): Command {
       )
     );
 
+  mods.command("versions <id>")
+    .description("list the builds this server can pin (pass one as --version to mods add)")
+    .requiredOption("--source <source>", "mod source (modrinth|curseforge)")
+    .requiredOption("--project <projectId>", "project ID or slug")
+    .action((id, o) =>
+      run(json(), make, (c) => c.mods.versions(id, { source: o.source, projectId: o.project }))
+    );
+
   mods.command("remove <id>")
     .requiredOption("--source <source>", "mod source (modrinth|curseforge)")
     .requiredOption("--project <projectId>", "project ID or slug")

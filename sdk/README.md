@@ -257,6 +257,10 @@ await client.mods.add("srv_xyz", {
   // versionSpec (optional): a numeric file ID
 });
 
+// Builds this server can pin: its loader and Minecraft version only, betas
+// included, newest first. Pass one's id as versionSpec to mods.add.
+const { versions, partial } = await client.mods.versions("srv_xyz", { source: "modrinth", projectId: "chunky" });
+
 // Remove a mod
 await client.mods.remove("srv_xyz", {
   source: "modrinth",

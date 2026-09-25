@@ -15,6 +15,7 @@ function fakeClient() {
       list: vi.fn(async () => []),
     },
     console: { run: vi.fn(async () => ({ output: "ok" })) },
+    mods: { versions: vi.fn(async () => ({ versions: [], partial: false })) },
     whoami: vi.fn(async () => ({ accountId: "acc-1" })),
   };
 }
@@ -26,6 +27,13 @@ describe("CLI commands", () => {
     await buildProgram(() => c as any).parseAsync(["node", "truetick", "servers", "list"]);
     expect(c.servers.list).toHaveBeenCalled();
     spy.mockRestore();
+  });
+  it("mods versions passes source + project to sdk", async () => {
+    const c = fakeClient();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "table").mockImplementation(() => {});
+    await buildProgram(() => c as any).parseAsync(["node", "truetick", "mods", "versions", "s1", "--source", "modrinth", "--project", "pixelmon"]);
+    expect(c.mods.versions).toHaveBeenCalledWith("s1", { source: "modrinth", projectId: "pixelmon" });
   });
   it("console passes id + command to sdk", async () => {
     const c = fakeClient();
