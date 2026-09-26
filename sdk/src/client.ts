@@ -135,6 +135,19 @@ export class TrueTickClient {
     create: async (id: string): Promise<Backup> => toBackup(await this.http.post(`/v1/servers/${enc(id)}/backups`, {})),
     list: async (id: string): Promise<Backup[]> => ((await this.http.get(`/v1/servers/${enc(id)}/backups`)).backups ?? []).map(toBackup),
     restore: async (id: string, backupId: string): Promise<void> => { await this.http.post(`/v1/servers/${enc(id)}/backups/${enc(backupId)}:restore`, {}); },
+    /**
+     * Keep a backup out of rotation until it is unkept: retention doesn't delete it, nor does a
+     * snapshot's 72-hour expiry, and it can't be deleted until unkept (deleting the server still
+     * deletes it). Up to 3 per server, by the account's owner — an API key acts as the owner. Kept
+     * backups count toward the server's backup space: keeping a daily backup is refused when it
+     * would leave no room for the safety snapshot a restore takes first. Keeping a kept one changes nothing.
+     */
+    keep: async (id: string, backupId: string): Promise<Backup> => toBackup(await this.http.post(`/v1/servers/${enc(id)}/backups/${enc(backupId)}:set-kept`, { kept: true })),
+    /**
+     * Put a kept backup back into rotation: the server's next daily, manual or scheduled backup may
+     * then delete it, and a snapshot past its 72 hours goes at the next hourly clean-up.
+     */
+    unkeep: async (id: string, backupId: string): Promise<Backup> => toBackup(await this.http.post(`/v1/servers/${enc(id)}/backups/${enc(backupId)}:set-kept`, { kept: false })),
   };
 
   mods = {

@@ -108,6 +108,12 @@ truetick backups list <id>
 
 # Restore a backup (server must be stopped; requires --yes confirmation)
 truetick backups restore <id> <backupId> --yes
+
+# Keep a backup out of rotation until you unkeep it (up to 3 per server)
+truetick backups keep <id> <backupId>
+
+# Put it back into rotation (the next daily, manual or scheduled backup may then delete it)
+truetick backups unkeep <id> <backupId>
 ```
 
 ### Mods

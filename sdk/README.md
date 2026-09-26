@@ -233,6 +233,12 @@ const backups = await client.backups.list("srv_xyz");
 
 // Restore a backup (server must be stopped)
 await client.backups.restore("srv_xyz", backup.id);
+
+// Keep a backup out of rotation until you unkeep it (up to 3 per server;
+// counts toward the server's backup space). `keptAt` says when it was kept.
+const kept = await client.backups.keep("srv_xyz", backup.id);
+// Put it back into rotation: the next daily, manual or scheduled backup may then delete it
+await client.backups.unkeep("srv_xyz", backup.id);
 ```
 
 ### Mods & Plugins

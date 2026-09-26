@@ -120,6 +120,13 @@ export interface Backup {
   kind?: string;
   /** Qualifies kind; for "preop", the operation it was taken before ("version-change"). */
   reason?: string;
+  /**
+   * When the account's owner kept this backup (`backups.keep`); absent when
+   * it isn't kept, and from an older API. A kept backup is outside rotation
+   * and the 72-hour snapshot expiry, and can't be deleted until it is unkept;
+   * deleting the server still deletes it.
+   */
+  keptAt?: string;
 }
 
 export interface FileEntry {
@@ -228,4 +235,5 @@ export const toBackup = (r: any): Backup => ({
   sizeBytes: num(r.sizeBytes),
   kind: r.kind,
   reason: r.reason,
+  keptAt: r.keptAt,
 });

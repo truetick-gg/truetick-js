@@ -49,6 +49,19 @@ describe("TrueTickClient", () => {
     expect(r.output).toBe("pong");
   });
 
+  // Keep (R-N4 B9): one route, the wanted state always in the body — the API
+  // refuses a body without kept rather than unkeeping by default.
+  it("backups.keep and backups.unkeep post the wanted state to :set-kept", async () => {
+    const c = client();
+    await c.backups.keep("s1", "b 1");
+    await c.backups.unkeep("s1", "b 1");
+    const calls = (fetch as any).mock.calls.filter((x: any[]) => x[0].includes(":set-kept"));
+    expect(calls.map((x: any[]) => [x[0], x[1].method, JSON.parse(x[1].body)])).toEqual([
+      ["https://api.example/v1/servers/s1/backups/b%201:set-kept", "POST", { kept: true }],
+      ["https://api.example/v1/servers/s1/backups/b%201:set-kept", "POST", { kept: false }],
+    ]);
+  });
+
   it("servers.create derives id/hostname/container/addr from name and posts them", async () => {
     await client("https://api.truetick.gg").servers.create({ name: "My Server!", ramMb: 2048 });
     const postCall = (fetch as any).mock.calls.find((c: any[]) => c[0].endsWith("/v1/servers") && c[1].method === "POST");

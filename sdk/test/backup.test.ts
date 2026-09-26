@@ -14,5 +14,10 @@ describe("toBackup", () => {
     const b = toBackup({ id: "b1", serverId: "s1", createdAt: "t", sizeBytes: "1" });
     expect(b.kind).toBeUndefined();
     expect(b.reason).toBeUndefined();
+    expect(b.keptAt).toBeUndefined();
+  });
+  // Keep (R-N4 B9): when the owner kept it; proto3 JSON omits it when not kept.
+  it("carries keptAt", () => {
+    expect(toBackup({ id: "b1", serverId: "s1", createdAt: "t", sizeBytes: "1", keptAt: "2026-09-26T12:08:30Z" }).keptAt).toBe("2026-09-26T12:08:30Z");
   });
 });

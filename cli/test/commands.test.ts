@@ -16,6 +16,10 @@ function fakeClient() {
     },
     console: { run: vi.fn(async () => ({ output: "ok" })) },
     mods: { versions: vi.fn(async () => ({ versions: [], partial: false })) },
+    backups: {
+      keep: vi.fn(async () => ({ id: "b1", keptAt: "2026-09-26T12:00:00Z" })),
+      unkeep: vi.fn(async () => ({ id: "b1" })),
+    },
     whoami: vi.fn(async () => ({ accountId: "acc-1" })),
   };
 }
@@ -34,6 +38,15 @@ describe("CLI commands", () => {
     vi.spyOn(console, "table").mockImplementation(() => {});
     await buildProgram(() => c as any).parseAsync(["node", "truetick", "mods", "versions", "s1", "--source", "modrinth", "--project", "pixelmon"]);
     expect(c.mods.versions).toHaveBeenCalledWith("s1", { source: "modrinth", projectId: "pixelmon" });
+  });
+  it("backups keep and unkeep pass server + backup to sdk", async () => {
+    const c = fakeClient();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "table").mockImplementation(() => {});
+    await buildProgram(() => c as any).parseAsync(["node", "truetick", "backups", "keep", "s1", "b1"]);
+    await buildProgram(() => c as any).parseAsync(["node", "truetick", "backups", "unkeep", "s1", "b1"]);
+    expect(c.backups.keep).toHaveBeenCalledWith("s1", "b1");
+    expect(c.backups.unkeep).toHaveBeenCalledWith("s1", "b1");
   });
   it("console passes id + command to sdk", async () => {
     const c = fakeClient();

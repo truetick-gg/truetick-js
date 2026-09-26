@@ -209,6 +209,17 @@ export function buildProgram(make: MakeClient = defaultMakeClient): Command {
       )
     );
 
+  // Keep (R-N4 B9): up to 3 a server, the account's owner (a key acts as the
+  // owner). Unkeep deletes nothing by itself, so it asks for no --yes; what it
+  // risks is in its description.
+  backups.command("keep <id> <backupId>")
+    .description("keep a backup out of rotation until unkept (up to 3 per server; counts toward backup space)")
+    .action((id, backupId) => run(json(), make, (c) => c.backups.keep(id, backupId)));
+
+  backups.command("unkeep <id> <backupId>")
+    .description("put a kept backup back into rotation — the next daily, manual or scheduled backup may then delete it")
+    .action((id, backupId) => run(json(), make, (c) => c.backups.unkeep(id, backupId)));
+
   // mods subcommands
   const mods = program.command("mods");
 
